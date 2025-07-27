@@ -1,0 +1,44 @@
+function Get-LatestComputer {
+    # the function searches for the latest computer object in active directory (based on sequential numbering) and calculates the next possible / free one
+    # a PSCustomObject is returned. Can be used like so:
+    # $myPrefix = "ABC-"
+    # $myTest = Get-LatestComputer -prefix $myPrefix
+    # Write-Host "The last computer with the given prefix $($myPrefix) is $($myTest.latestComputer) and the next one that is free would be $($myTest.nextComputer)"
+    
+    param (
+        [string]$prefix = "AAD-", # change according to your needs
+        [int]$paddingDigits = 3 # change according to your needs
+    )
+    
+    try {
+        # search for alle the computers with the specified suffix in your domain - no activedirectory module needed
+        $ds = New-Object System.DirectoryServices.DirectorySearcher
+        $ds.Filter = "(&(objectClass=computer)(sAMAccountName=$($prefix)*))" 
+        $allComputers = $ds.FindAll()
+        $null = $allComputers[0].Properties["name"]
+    }
+    catch {
+        Write-Warning "Nothing found using prefix $($prefix). Is the prefix valid and do you have domain connectivity?"
+        return
+    }
+
+    $allComputerNames = [System.Collections.Generic.List[string]]::new()
+
+    foreach ($computer in $allComputers) {
+        $allComputerNames.Add($computer.Properties["name"][0])
+    }
+
+    $allComputerNames.Sort()
+    $allComputerNames.Reverse()
+    
+    $latestComputer = $allComputerNames[0]
+    $indexOfLatestComputer = [int]($latestComputer -replace "$($prefix)", "")
+    $indexOfNextComputer = "{0:D$($paddingDigits)}" -f $($indexOfLatestComputer + 1)
+    $nextComputer = $($prefix) + "$($indexOfNextComputer)"
+
+    return [PSCustomObject]@{
+        latestComputer = $latestComputer
+        nextComputer = $nextComputer
+    }
+
+}
